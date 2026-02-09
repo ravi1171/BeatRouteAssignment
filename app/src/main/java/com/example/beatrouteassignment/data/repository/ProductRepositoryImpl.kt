@@ -1,91 +1,97 @@
 package com.example.beatrouteassignment.data.repository
 
 import com.example.beatrouteassignment.data.remote.ProductRemoteDataSource
+import com.example.beatrouteassignment.di.IoDispatcher
 import com.example.beatrouteassignment.domain.model.ProductUpdate
 import com.example.beatrouteassignment.domain.repository.ProductRepository
 import com.example.producthandling.model.Product
 import kotlinx.coroutines.CoroutineDispatcher
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.channels.awaitClose
-import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.callbackFlow
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.async
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.sync.Mutex
-import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.supervisorScope
+import javax.inject.Inject
+import javax.inject.Singleton
 
-class ProductRepositoryImpl(
+@Singleton
+class ProductRepositoryImpl @Inject constructor(
     private val remoteDataSource: ProductRemoteDataSource,
-    private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO
+    @IoDispatcher private val ioDispatcher: CoroutineDispatcher
 ) : ProductRepository {
 
-    private val mutex = Mutex()
+    private val _productUpdates =
+        MutableStateFlow<ProductUpdate>(ProductUpdate.Initial(emptyList()))
+    override val productUpdates: StateFlow<ProductUpdate> = _productUpdates.asStateFlow()
 
-    override fun observeProductUpdates(): Flow<ProductUpdate> = callbackFlow {
+    private val repositoryScope = CoroutineScope(SupervisorJob() + ioDispatcher)
 
-        val currentProducts = mutableListOf<Product>()
+    override fun observeProductUpdates(): StateFlow<ProductUpdate> {
+        repositoryScope.launch {
+            try {
+                val currentProducts = remoteDataSource.getAllProducts().toMutableList()
+                _productUpdates.value = ProductUpdate.Initial(currentProducts.toList())
 
-        val baseProducts = remoteDataSource.getAllProducts()
-        mutex.withLock { currentProducts.addAll(baseProducts) }
+                val tax = remoteDataSource.getPriceTax()
+                currentProducts.applyTax(tax)
+                _productUpdates.value = ProductUpdate.PricesUpdated(currentProducts.toList())
 
-        trySend(ProductUpdate.Initial(currentProducts.toList()))
+                supervisorScope {
+                    val deferredDelete = async { remoteDataSource.getProductsToDelete() }
+                    val deferredNew = async { remoteDataSource.getNewProducts() }
+                    val deferredStock = async { remoteDataSource.getCompanyUpdatedStocks() }
+                    val deferredPrices = async { remoteDataSource.getCompanyUpdatedPrices() }
 
-        val tax = remoteDataSource.getPriceTax()
+                    deferredDelete.await().let { ids ->
+                        currentProducts.removeAll { it.id in ids }
+                        _productUpdates.value =
+                            ProductUpdate.ProductsDeleted(currentProducts.toList())
+                    }
 
-        mutex.withLock {
-            currentProducts.replaceAll { product ->
-                val price = product.price ?: 0.0
-                product.copy(price = price * (1 + tax / 100))
+                    deferredNew.await().let { newProducts ->
+                        currentProducts.addAll(newProducts.applyTaxToList(tax))
+                        _productUpdates.value =
+                            ProductUpdate.NewProductsAdded(currentProducts.toList())
+                    }
+
+                    deferredStock.await().toMap().let { stockMap ->
+                        currentProducts.updateStocks(stockMap)
+                        _productUpdates.value =
+                            ProductUpdate.StocksUpdated(currentProducts.toList())
+                    }
+
+                    deferredPrices.await().toMap().let { priceMap ->
+                        currentProducts.updatePrices(priceMap)
+                        _productUpdates.value =
+                            ProductUpdate.PricesUpdated(currentProducts.toList())
+                    }
+                }
+            } catch (e: Exception) {
+                e.printStackTrace()
             }
         }
-        trySend(ProductUpdate.PricesUpdated(currentProducts.toList()))
+        return productUpdates
+    }
 
-        launch(ioDispatcher) {
-            runCatching { remoteDataSource.getProductsToDelete() }
-                .onSuccess { idsToDelete ->
-                    mutex.withLock { currentProducts.removeAll { it.id in idsToDelete } }
-                    trySend(ProductUpdate.ProductsDeleted(currentProducts.toList()))
-                }
-        }
+    private fun MutableList<Product>.applyTax(tax: Double) = this.replaceAll { p ->
+        val price = p.price ?: 0.0
+        p.copy(price = price * (1 + tax / 100))
+    }
 
-        launch(ioDispatcher) {
-            runCatching { remoteDataSource.getNewProducts() }
-                .onSuccess { newProducts ->
-                    val taxedNewProducts = newProducts.map { product ->
-                        val price = product.price ?: 0.0
-                        product.copy(price = price * (1 + tax / 100))
-                    }
-                    mutex.withLock { currentProducts.addAll(taxedNewProducts) }
-                    trySend(ProductUpdate.NewProductsAdded(currentProducts.toList()))
-                }
-        }
+    private fun List<Product>.applyTaxToList(tax: Double) = this.map { p ->
+        val price = p.price ?: 0.0
+        p.copy(price = price * (1 + tax / 100))
+    }
 
-        launch(ioDispatcher) {
-            runCatching { remoteDataSource.getCompanyUpdatedStocks() }
-                .onSuccess { stockUpdates ->
-                    val stockMap = stockUpdates.toMap()
-                    mutex.withLock {
-                        currentProducts.replaceAll { product ->
-                            stockMap[product.id]?.let { newStock -> product.copy(stock = newStock) }
-                                ?: product
-                        }
-                    }
-                    trySend(ProductUpdate.StocksUpdated(currentProducts.toList()))
-                }
-        }
+    private fun MutableList<Product>.updateStocks(stockMap: Map<Int, Int>) = this.replaceAll { p ->
+        stockMap[p.id]?.let { p.copy(stock = it) } ?: p
+    }
 
-        launch(ioDispatcher) {
-            runCatching { remoteDataSource.getCompanyUpdatedPrices() }
-                .onSuccess { priceUpdates ->
-                    val priceMap = priceUpdates.toMap()
-                    mutex.withLock {
-                        currentProducts.replaceAll { product ->
-                            priceMap[product.id]?.let { newPrice -> product.copy(price = newPrice) }
-                                ?: product
-                        }
-                    }
-                    trySend(ProductUpdate.PricesUpdated(currentProducts.toList()))
-                }
-        }
-        awaitClose()
+    private fun MutableList<Product>.updatePrices(priceMap: Map<Int, Double>) =
+        this.replaceAll { p ->
+            priceMap[p.id]?.let { p.copy(price = it) } ?: p
     }
 }
