@@ -1,4 +1,4 @@
-package com.example.beatrouteassignment
+package com.example.beatrouteassignment.presentation
 
 import android.os.Bundle
 import androidx.activity.ComponentActivity
@@ -11,7 +11,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.tooling.preview.Preview
-import com.example.beatrouteassignment.ui.theme.BeatRouteAssignmentTheme
+import com.example.beatrouteassignment.presentation.theme.BeatRouteAssignmentTheme
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {

@@ -1,4 +1,4 @@
-package com.example.beatrouteassignment.ui.theme
+package com.example.beatrouteassignment.presentation.theme
 
 import androidx.compose.ui.graphics.Color
 
