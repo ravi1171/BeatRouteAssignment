@@ -1,9 +1,18 @@
 package com.example.beatrouteassignment.domain.repository
 
-import com.example.beatrouteassignment.domain.model.ProductUpdate
-import kotlinx.coroutines.flow.StateFlow
+import com.example.producthandling.model.Product
 
 interface ProductRepository {
-    val productUpdates: StateFlow<ProductUpdate>
-    fun observeProductUpdates(): StateFlow<ProductUpdate>
+
+    suspend fun getAllProducts(): List<Product>
+
+    suspend fun getPriceTax(): Double
+
+    suspend fun getCompanyUpdatedPrices(): List<Pair<Int, Double>>
+
+    suspend fun getCompanyUpdatedStocks(): List<Pair<Int, Int>>
+
+    suspend fun getProductsToDelete(): List<Int>
+
+    suspend fun getNewProducts(): List<Product>
 }
