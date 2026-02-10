@@ -21,23 +21,19 @@ class ProductViewModel @Inject constructor(
     private val updatesUseCase: ProductUpdatesUseCase
 ) : ViewModel() {
 
-
     private val _uiState = MutableStateFlow<ProductUiState>(ProductUiState.Loading)
     val uiState: StateFlow<ProductUiState> = _uiState.asStateFlow()
-
 
     init {
         observeProducts()
         fetchProducts()
     }
 
-
     private fun fetchProducts() {
         viewModelScope.launch {
             updatesUseCase.fetchProducts()
         }
     }
-
 
     private fun observeProducts() {
         viewModelScope.launch {
