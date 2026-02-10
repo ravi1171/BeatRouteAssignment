@@ -91,7 +91,7 @@ class ProductViewModel @Inject constructor(
 
     private fun emitUi() {
         _uiState.value = ProductUiState.Success(
-            productStore.values.take(5_000)
+            productStore.values.toList()
         )
     }
 }
