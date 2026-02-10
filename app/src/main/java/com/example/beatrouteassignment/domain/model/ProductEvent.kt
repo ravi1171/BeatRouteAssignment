@@ -10,4 +10,3 @@ sealed class ProductEvent {
     data class StockUpdated(val updates: Map<Int, Int>) : ProductEvent()
     data class PriceUpdated(val updates: Map<Int, Double>) : ProductEvent()
 }
-
