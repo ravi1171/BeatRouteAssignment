@@ -17,11 +17,9 @@ class ProductUpdatesUseCase @Inject constructor(
 
     fun events(): Flow<ProductEvent> = channelFlow {
 
-        // 1️⃣ Must be called first (base data)
         val baseProducts = repository.getAllProducts()
         send(ProductEvent.BaseLoaded(baseProducts))
 
-        // 2️⃣ All other APIs run independently in parallel
         supervisorScope {
 
             launch(dispatcher) {
