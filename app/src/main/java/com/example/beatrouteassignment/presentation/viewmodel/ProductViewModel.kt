@@ -33,7 +33,6 @@ class ProductViewModel @Inject constructor(
 
 
     private fun fetchProducts() {
-// ViewModel controls lifecycle using viewModelScope (Best Practice)
         viewModelScope.launch {
             updatesUseCase.fetchProducts()
         }
@@ -59,10 +58,10 @@ class ProductViewModel @Inject constructor(
 
 
     private fun ProductUpdate.toProducts(): List<Product> = when (this) {
-        is ProductUpdate.Initial -> products
-        is ProductUpdate.PricesUpdated -> products
-        is ProductUpdate.StocksUpdated -> products
-        is ProductUpdate.ProductsDeleted -> products
-        is ProductUpdate.NewProductsAdded -> products
+        is ProductUpdate.Initial -> productList
+        is ProductUpdate.PricesUpdated -> productList
+        is ProductUpdate.StocksUpdated -> productList
+        is ProductUpdate.ProductsDeleted -> productList
+        is ProductUpdate.NewProductsAdded -> productList
     }
 }

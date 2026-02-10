@@ -1,16 +1,16 @@
 package com.example.beatrouteassignment.domain.usecase
 
-
+import android.util.Log
 import com.example.beatrouteassignment.di.IoDispatcher
 import com.example.beatrouteassignment.domain.model.ProductUpdate
 import com.example.beatrouteassignment.domain.repository.ProductRepository
 import com.example.producthandling.model.Product
 import kotlinx.coroutines.CoroutineDispatcher
-import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.supervisorScope
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import javax.inject.Inject
@@ -26,81 +26,127 @@ class ProductUpdatesUseCase @Inject constructor(
 
     val productUpdates: StateFlow<ProductUpdate> = _productUpdates.asStateFlow()
 
-    
-    suspend fun fetchProducts() = coroutineScope {
-        try {
-//  Fetch base products first
-            var currentProducts: List<Product> = repository.getAllProducts()
 
-            _productUpdates.value = ProductUpdate.Initial(currentProducts)
+    suspend fun fetchProducts() = supervisorScope {
 
-
-// Mutex for thread-safe updates
-            val mutex = Mutex()
-
-
-//  Fetch tax in parallel
-            launch(ioDispatcher) {
-                val tax = repository.getPriceTax()
-                mutex.withLock {
-                    currentProducts = currentProducts.map {
-                        it.copy(
-                            price = (it.price ?: 0.0) * (1 + tax / 100)
-                        )
-                    }
-                    _productUpdates.value = ProductUpdate.PricesUpdated(currentProducts)
-                }
-            }
-
-
-// Fetch delete list in parallel
-            launch(ioDispatcher) {
-                val deleteIds = repository.getProductsToDelete()
-                mutex.withLock {
-                    currentProducts = currentProducts.filter {
-                        it.id !in deleteIds
-                    }
-                    _productUpdates.value = ProductUpdate.ProductsDeleted(currentProducts)
-                }
-            }
-
-            // Fetch new products in parallel
-            launch(ioDispatcher) {
-                val newProducts = repository.getNewProducts()
-                mutex.withLock {
-                    currentProducts = currentProducts + newProducts
-                    _productUpdates.value = ProductUpdate.NewProductsAdded(currentProducts)
-                }
-            }
-
-            //  Fetch stock updates in parallel
-            launch(ioDispatcher) {
-                val stockMap = repository.getCompanyUpdatedStocks().toMap()
-                mutex.withLock {
-                    currentProducts = currentProducts.map {
-                        it.copy(
-                            stock = stockMap[it.id] ?: it.stock
-                        )
-                    }
-                    _productUpdates.value = ProductUpdate.StocksUpdated(currentProducts)
-                }
-            }
-
-            //  Fetch price updates in parallel
-            launch(ioDispatcher) {
-                val priceMap = repository.getCompanyUpdatedPrices().toMap()
-                mutex.withLock {
-                    currentProducts = currentProducts.map {
-                        it.copy(
-                            price = priceMap[it.id] ?: it.price
-                        )
-                    }
-                    _productUpdates.value = ProductUpdate.PricesUpdated(currentProducts)
-                }
-            }
-
+        val baseList = try {
+            repository.getAllProducts()
         } catch (e: Exception) {
-            println($$"ProductUpdatesUseCase Error: ${e.message}")
+            Log.e("UseCase", "Base API failed", e)
+            return@supervisorScope
         }
+
+        val productMap = baseList.associateBy { it.id }.toMutableMap()
+
+        _productUpdates.value = ProductUpdate.Initial(productMap.values.toList())
+
+        val mutex = Mutex()
+
+
+        launch(ioDispatcher) {
+            try {
+                val tax = repository.getPriceTax()
+
+                mutex.withLock {
+
+                    productMap.forEach { (id, product) ->
+                        productMap[id] = product.copy(
+                            price = (product.price ?: 0.0) * (1 + tax / 100)
+                        )
+                    }
+                    emitUpdate(productMap)
+                }
+
+            } catch (e: Exception) {
+                Log.e("UseCase", "Tax API failed", e)
+            }
+        }
+
+
+        launch(ioDispatcher) {
+            try {
+                val deleteIds = repository.getProductsToDelete()
+
+                mutex.withLock {
+
+                    deleteIds.forEach {
+                        productMap.remove(it)
+                    }
+
+                    emitUpdate(productMap)
+                }
+
+            } catch (e: Exception) {
+                Log.e("UseCase", "Delete API failed", e)
+            }
+        }
+
+
+        launch(ioDispatcher) {
+            try {
+                val newProducts = repository.getNewProducts()
+
+                mutex.withLock {
+
+                    newProducts.forEach {
+                        productMap[it.id] = it
+                    }
+
+                    emitUpdate(productMap)
+                }
+
+            } catch (e: Exception) {
+                Log.e("UseCase", "New Products API failed", e)
+            }
+        }
+
+
+        launch(ioDispatcher) {
+            try {
+                val stocks = repository.getCompanyUpdatedStocks()
+
+                mutex.withLock {
+
+                    stocks.forEach { (id, stock) ->
+                        productMap[id]?.let { p ->
+                            productMap[id] = p.copy(stock = stock)
+                        }
+                    }
+
+                    emitUpdate(productMap)
+                }
+
+            } catch (e: Exception) {
+                Log.e("UseCase", "Stock API failed", e)
+            }
+        }
+
+
+        launch(ioDispatcher) {
+            try {
+                val prices = repository.getCompanyUpdatedPrices()
+
+                mutex.withLock {
+
+                    prices.forEach { (id, price) ->
+                        productMap[id]?.let { p ->
+                            productMap[id] = p.copy(price = price)
+                        }
+                    }
+                    emitUpdate(productMap)
+                }
+
+            } catch (e: Exception) {
+                Log.e("UseCase", "Price API failed", e)
+            }
+        }
+    }
+
+    private fun emitUpdate(
+        map: Map<Int, Product>
+    ) {
+        _productUpdates.value = ProductUpdate.PricesUpdated(
+            map.values.toList()
+        )
     }
 }
