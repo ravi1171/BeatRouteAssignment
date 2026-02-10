@@ -26,10 +26,10 @@ class ProductUpdatesUseCase @Inject constructor(
 
     val productUpdates: StateFlow<ProductUpdate> = _productUpdates.asStateFlow()
 
-    // Called from ViewModel (viewModelScope)
+    
     suspend fun fetchProducts() = coroutineScope {
         try {
-// 1️⃣ Fetch base products first
+//  Fetch base products first
             var currentProducts: List<Product> = repository.getAllProducts()
 
             _productUpdates.value = ProductUpdate.Initial(currentProducts)
@@ -39,7 +39,7 @@ class ProductUpdatesUseCase @Inject constructor(
             val mutex = Mutex()
 
 
-// 2️⃣ Fetch tax in parallel
+//  Fetch tax in parallel
             launch(ioDispatcher) {
                 val tax = repository.getPriceTax()
                 mutex.withLock {
@@ -53,7 +53,7 @@ class ProductUpdatesUseCase @Inject constructor(
             }
 
 
-// 3️⃣ Fetch delete list in parallel
+// Fetch delete list in parallel
             launch(ioDispatcher) {
                 val deleteIds = repository.getProductsToDelete()
                 mutex.withLock {
@@ -64,7 +64,7 @@ class ProductUpdatesUseCase @Inject constructor(
                 }
             }
 
-            // 4️⃣ Fetch new products in parallel
+            // Fetch new products in parallel
             launch(ioDispatcher) {
                 val newProducts = repository.getNewProducts()
                 mutex.withLock {
@@ -73,7 +73,7 @@ class ProductUpdatesUseCase @Inject constructor(
                 }
             }
 
-            // 5️⃣ Fetch stock updates in parallel
+            //  Fetch stock updates in parallel
             launch(ioDispatcher) {
                 val stockMap = repository.getCompanyUpdatedStocks().toMap()
                 mutex.withLock {
@@ -86,7 +86,7 @@ class ProductUpdatesUseCase @Inject constructor(
                 }
             }
 
-            // 6️⃣ Fetch price updates in parallel
+            //  Fetch price updates in parallel
             launch(ioDispatcher) {
                 val priceMap = repository.getCompanyUpdatedPrices().toMap()
                 mutex.withLock {
