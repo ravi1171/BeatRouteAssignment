@@ -72,7 +72,6 @@ class ProductUpdatesUseCase @Inject constructor(
                     deleteIds.forEach {
                         productMap.remove(it)
                     }
-
                     emitUpdate(productMap)
                 }
 
@@ -91,7 +90,6 @@ class ProductUpdatesUseCase @Inject constructor(
                     newProducts.forEach {
                         productMap[it.id] = it
                     }
-
                     emitUpdate(productMap)
                 }
 
@@ -112,7 +110,6 @@ class ProductUpdatesUseCase @Inject constructor(
                             productMap[id] = p.copy(stock = stock)
                         }
                     }
-
                     emitUpdate(productMap)
                 }
 
