@@ -21,26 +21,44 @@ class ProductViewModel @Inject constructor(
     private val updatesUseCase: ProductUpdatesUseCase
 ) : ViewModel() {
 
+
     private val _uiState = MutableStateFlow<ProductUiState>(ProductUiState.Loading)
     val uiState: StateFlow<ProductUiState> = _uiState.asStateFlow()
 
+
     init {
         observeProducts()
-        updatesUseCase.fetchProducts() // Start fetching immediately
+        fetchProducts()
     }
+
+
+    private fun fetchProducts() {
+// ViewModel controls lifecycle using viewModelScope (Best Practice)
+        viewModelScope.launch {
+            updatesUseCase.fetchProducts()
+        }
+    }
+
 
     private fun observeProducts() {
         viewModelScope.launch {
             updatesUseCase.productUpdates
-                .onStart { _uiState.value = ProductUiState.Loading }
-                .catch { e -> _uiState.value = ProductUiState.Error(e.message ?: "Unknown error") }
+                .onStart {
+                    _uiState.value = ProductUiState.Loading
+                }
+                .catch { e ->
+                    _uiState.value =
+                        ProductUiState.Error(e.message ?: "Unknown error")
+                }
                 .collect { update ->
-                    _uiState.value = ProductUiState.Success(update.products())
+                    _uiState.value =
+                        ProductUiState.Success(update.toProducts())
                 }
         }
     }
 
-    private fun ProductUpdate.products(): List<Product> = when (this) {
+
+    private fun ProductUpdate.toProducts(): List<Product> = when (this) {
         is ProductUpdate.Initial -> products
         is ProductUpdate.PricesUpdated -> products
         is ProductUpdate.StocksUpdated -> products
