@@ -7,8 +7,8 @@ import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.channelFlow
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.supervisorScope
 import javax.inject.Inject
-
 
 class ProductUpdatesUseCase @Inject constructor(
     private val repository: ProductRepository,
@@ -17,50 +17,36 @@ class ProductUpdatesUseCase @Inject constructor(
 
     fun events(): Flow<ProductEvent> = channelFlow {
 
+        // 1️⃣ Must be called first (base data)
         val baseProducts = repository.getAllProducts()
         send(ProductEvent.BaseLoaded(baseProducts))
 
-        launch(dispatcher) {
-            runCatching { repository.getPriceTax() }.onSuccess { send(ProductEvent.TaxReceived(it)) }
-        }
+        // 2️⃣ All other APIs run independently in parallel
+        supervisorScope {
 
-        launch(dispatcher) {
-            runCatching { repository.getProductsToDelete() }.onSuccess {
-                send(
-                    ProductEvent.ProductsDeleted(
-                        it
-                    )
-                )
+            launch(dispatcher) {
+                runCatching { repository.getPriceTax() }
+                    .onSuccess { send(ProductEvent.TaxReceived(it)) }
             }
-        }
 
-        launch(dispatcher) {
-            runCatching { repository.getNewProducts() }.onSuccess {
-                send(
-                    ProductEvent.ProductsAdded(
-                        it
-                    )
-                )
+            launch(dispatcher) {
+                runCatching { repository.getProductsToDelete() }
+                    .onSuccess { send(ProductEvent.ProductsDeleted(it)) }
             }
-        }
 
-        launch(dispatcher) {
-            runCatching { repository.getCompanyUpdatedStocks() }.onSuccess {
-                send(
-                    ProductEvent.StockUpdated(
-                        it.toMap()
-                    )
-                )
+            launch(dispatcher) {
+                runCatching { repository.getNewProducts() }
+                    .onSuccess { send(ProductEvent.ProductsAdded(it)) }
             }
-        }
 
-        launch(dispatcher) {
-            runCatching { repository.getCompanyUpdatedPrices() }.onSuccess {
-                send(
-                    ProductEvent.PriceUpdated(
-                        it.toMap()
-                    )
-                )
+            launch(dispatcher) {
+                runCatching { repository.getCompanyUpdatedStocks() }
+                    .onSuccess { send(ProductEvent.StockUpdated(it.toMap())) }
+            }
+
+            launch(dispatcher) {
+                runCatching { repository.getCompanyUpdatedPrices() }
+                    .onSuccess { send(ProductEvent.PriceUpdated(it.toMap())) }
             }
         }
     }
