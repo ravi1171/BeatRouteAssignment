@@ -2,62 +2,96 @@ package com.example.beatrouteassignment.presentation.viewmodel
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.example.beatrouteassignment.domain.model.ProductUpdate
+import com.example.beatrouteassignment.domain.model.ProductEvent
 import com.example.beatrouteassignment.domain.usecase.ProductUpdatesUseCase
 import com.example.beatrouteassignment.presentation.component.ProductUiState
 import com.example.producthandling.model.Product
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.catch
-import kotlinx.coroutines.flow.onStart
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
 
 @HiltViewModel
 class ProductViewModel @Inject constructor(
-    private val updatesUseCase: ProductUpdatesUseCase
+    private val useCase: ProductUpdatesUseCase
 ) : ViewModel() {
 
-    private val _uiState = MutableStateFlow<ProductUiState>(ProductUiState.Loading)
-    val uiState: StateFlow<ProductUiState> = _uiState.asStateFlow()
+    private val productStore = mutableMapOf<Int, Product>()
+    private var tax: Double? = null
+
+    private val _uiState =
+        MutableStateFlow<ProductUiState>(ProductUiState.Loading)
+    val uiState = _uiState.asStateFlow()
 
     init {
-        observeProducts()
-        fetchProducts()
+        observe()
     }
 
-    private fun fetchProducts() {
+    private fun observe() {
         viewModelScope.launch {
-            updatesUseCase.fetchProducts()
+            useCase.events().collect { event ->
+                applyEvent(event)
+            }
         }
     }
 
-    private fun observeProducts() {
-        viewModelScope.launch {
-            updatesUseCase.productUpdates
-                .onStart {
-                    _uiState.value = ProductUiState.Loading
+    private fun applyEvent(event: ProductEvent) {
+        when (event) {
+
+            is ProductEvent.BaseLoaded -> {
+                productStore.clear()
+                event.products.forEach { productStore[it.id] = it }
+                emitUi()
+            }
+
+            is ProductEvent.TaxReceived -> {
+                tax = event.tax
+                productStore.replaceAll { _, p ->
+                    p.copy(price = (p.price ?: 0.0) * (1 + event.tax / 100))
                 }
-                .catch { e ->
-                    _uiState.value =
-                        ProductUiState.Error(e.message ?: "Unknown error")
+                emitUi()
+            }
+
+            is ProductEvent.ProductsDeleted -> {
+                event.ids.forEach { productStore.remove(it) }
+                emitUi()
+            }
+
+            is ProductEvent.ProductsAdded -> {
+                val t = tax
+                event.products.forEach {
+                    productStore[it.id] =
+                        if (t != null) it.copy(price = it.price!! * (1 + t / 100))
+                        else it
                 }
-                .collect { update ->
-                    _uiState.value =
-                        ProductUiState.Success(update.toProducts())
+                emitUi()
+            }
+
+            is ProductEvent.StockUpdated -> {
+                event.updates.forEach { (id, stock) ->
+                    productStore[id]?.let {
+                        productStore[id] = it.copy(stock = stock)
+                    }
                 }
+                emitUi()
+            }
+
+            is ProductEvent.PriceUpdated -> {
+                event.updates.forEach { (id, price) ->
+                    productStore[id]?.let {
+                        productStore[id] = it.copy(price = price)
+                    }
+                }
+                emitUi()
+            }
         }
     }
 
-
-    private fun ProductUpdate.toProducts(): List<Product> = when (this) {
-        is ProductUpdate.Initial -> productList
-        is ProductUpdate.PricesUpdated -> productList
-        is ProductUpdate.StocksUpdated -> productList
-        is ProductUpdate.ProductsDeleted -> productList
-        is ProductUpdate.NewProductsAdded -> productList
+    private fun emitUi() {
+        _uiState.value = ProductUiState.Success(
+            productStore.values.take(5_000)
+        )
     }
 }
