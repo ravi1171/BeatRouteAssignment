@@ -1,7 +1,7 @@
 package com.example.beatrouteassignment.domain.usecase
 
-import com.example.beatrouteassignment.data.repository.ProductRepositoryImpl
 import com.example.beatrouteassignment.domain.model.ProductUpdate
+import com.example.beatrouteassignment.domain.repository.ProductRepository
 import com.example.producthandling.model.Product
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -13,7 +13,7 @@ import kotlinx.coroutines.launch
 import javax.inject.Inject
 
 class ProductUpdatesUseCase @Inject constructor(
-    private val repository: ProductRepositoryImpl
+    private val repository: ProductRepository
 ) {
 
     private val _productUpdates =
