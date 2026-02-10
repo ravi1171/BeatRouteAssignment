@@ -47,7 +47,12 @@ fun ProductScreen(viewModel: ProductViewModel) {
 
 @Composable
 fun ProductList(products: List<Product>) {
-    LazyColumn(modifier = Modifier.fillMaxSize(), contentPadding = PaddingValues(8.dp)) {
+    LazyColumn(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(top = 32.dp),
+        contentPadding = PaddingValues(8.dp)
+    ) {
         items(products) { ProductItem(it); Divider() }
     }
 }
