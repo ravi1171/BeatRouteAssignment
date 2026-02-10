@@ -18,7 +18,7 @@ class ProductUpdatesUseCase @Inject constructor(
     fun events(): Flow<ProductEvent> = channelFlow {
 
         val baseProducts = repository.getAllProducts()
-        send(ProductEvent.BaseLoaded(baseProducts))
+        send(ProductEvent.BaseProduct(baseProducts))
 
         supervisorScope {
 

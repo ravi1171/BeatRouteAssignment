@@ -40,7 +40,7 @@ class ProductViewModel @Inject constructor(
     private fun applyEvent(event: ProductEvent) {
         when (event) {
 
-            is ProductEvent.BaseLoaded -> {
+            is ProductEvent.BaseProduct -> {
                 productStore.clear()
                 event.products.forEach { productStore[it.id] = it }
                 emitUi()
