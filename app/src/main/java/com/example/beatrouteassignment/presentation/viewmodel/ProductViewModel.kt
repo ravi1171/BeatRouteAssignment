@@ -18,7 +18,9 @@ class ProductViewModel @Inject constructor(
 ) : ViewModel() {
 
     private val productStore = HashMap<Int, Product>(600_000)
-    private var tax: Double = 0.0
+
+    private val overriddenPriceIds = HashSet<Int>()
+    private var tax: Double? = null
 
     private val _uiState =
         MutableStateFlow<ProductUiState>(ProductUiState.Loading)
@@ -41,6 +43,8 @@ class ProductViewModel @Inject constructor(
 
             is ProductEvent.BaseProduct -> {
                 productStore.clear()
+                overriddenPriceIds.clear()
+
                 event.products.forEach {
                     productStore[it.id] = it
                 }
@@ -49,22 +53,34 @@ class ProductViewModel @Inject constructor(
 
             is ProductEvent.TaxReceived -> {
                 tax = event.tax
-                applyTaxToExistingProducts()
+                applyTaxToEligibleProducts()
                 emitSnapshot()
             }
 
             is ProductEvent.ProductsDeleted -> {
-                event.ids.forEach { productStore.remove(it) }
+                event.ids.forEach {
+                    productStore.remove(it)
+                    overriddenPriceIds.remove(it)
+                }
                 emitSnapshot()
             }
 
             is ProductEvent.ProductsAdded -> {
-                event.products.forEach {
-                    val taxedPrice = it.price?.let { price ->
-                        price * (1 + tax / 100)
-                    }
-                    productStore[it.id] = it.copy(price = taxedPrice)
+                val currentTax = tax
+
+                event.products.forEach { product ->
+                    val finalProduct =
+                        if (currentTax != null) {
+                            product.copy(
+                                price = product.price?.let {
+                                    it * (1 + currentTax / 100)
+                                }
+                            )
+                        } else product
+
+                    productStore[product.id] = finalProduct
                 }
+
                 emitSnapshot()
             }
 
@@ -81,6 +97,7 @@ class ProductViewModel @Inject constructor(
                 event.updates.forEach { (id, price) ->
                     productStore[id]?.let {
                         productStore[id] = it.copy(price = price)
+                        overriddenPriceIds.add(id) // mark as final price
                     }
                 }
                 emitSnapshot()
@@ -92,17 +109,26 @@ class ProductViewModel @Inject constructor(
         }
     }
 
-    private fun applyTaxToExistingProducts() {
+
+    private fun applyTaxToEligibleProducts() {
+        val currentTax = tax ?: return
+
         productStore.forEach { (id, product) ->
-            val updatedPrice = product.price?.let {
-                it * (1 + tax / 100)
+            if (!overriddenPriceIds.contains(id)) {
+
+                val updatedPrice = product.price?.let {
+                    it * (1 + currentTax / 100)
+                }
+
+                productStore[id] = product.copy(price = updatedPrice)
             }
-            productStore[id] = product.copy(price = updatedPrice)
         }
     }
 
     private fun emitSnapshot() {
-        _uiState.value = ProductUiState.Success(productStore.values.toList())
+        _uiState.value =
+            ProductUiState.Success(productStore.values.toList())
     }
 }
+
 
