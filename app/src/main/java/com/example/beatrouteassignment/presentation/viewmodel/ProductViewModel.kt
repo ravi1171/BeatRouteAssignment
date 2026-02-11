@@ -12,7 +12,6 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
-
 @HiltViewModel
 class ProductViewModel @Inject constructor(
     private val useCase: ProductUpdatesUseCase
@@ -48,9 +47,6 @@ class ProductViewModel @Inject constructor(
 
             is ProductEvent.TaxReceived -> {
                 tax = event.tax
-                productStore.replaceAll { _, p ->
-                    p.copy(price = (p.price ?: 0.0) * (1 + event.tax / 100))
-                }
                 emitUi()
             }
 
@@ -60,11 +56,8 @@ class ProductViewModel @Inject constructor(
             }
 
             is ProductEvent.ProductsAdded -> {
-                val t = tax
                 event.products.forEach {
-                    productStore[it.id] =
-                        if (t != null) it.copy(price = it.price!! * (1 + t / 100))
-                        else it
+                    productStore[it.id] = it
                 }
                 emitUi()
             }
@@ -90,8 +83,18 @@ class ProductViewModel @Inject constructor(
     }
 
     private fun emitUi() {
-        _uiState.value = ProductUiState.Success(
+        val currentTax = tax
+
+        val finalProducts = if (currentTax != null) {
+            productStore.values.map { product ->
+                product.copy(
+                    price = (product.price ?: 0.0) * (1 + currentTax / 100)
+                )
+            }
+        } else {
             productStore.values.toList()
-        )
+        }
+
+        _uiState.value = ProductUiState.Success(finalProducts)
     }
 }
