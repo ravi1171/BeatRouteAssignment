@@ -17,8 +17,8 @@ class ProductViewModel @Inject constructor(
     private val useCase: ProductUpdatesUseCase
 ) : ViewModel() {
 
-    private val productStore = mutableMapOf<Int, Product>()
-    private var tax: Double? = null
+    private val productStore = HashMap<Int, Product>(600_000)
+    private var tax: Double = 0.0
 
     private val _uiState =
         MutableStateFlow<ProductUiState>(ProductUiState.Loading)
@@ -41,25 +41,31 @@ class ProductViewModel @Inject constructor(
 
             is ProductEvent.BaseProduct -> {
                 productStore.clear()
-                event.products.forEach { productStore[it.id] = it }
-                emitUi()
+                event.products.forEach {
+                    productStore[it.id] = it
+                }
+                emitSnapshot()
             }
 
             is ProductEvent.TaxReceived -> {
                 tax = event.tax
-                emitUi()
+                applyTaxToExistingProducts()
+                emitSnapshot()
             }
 
             is ProductEvent.ProductsDeleted -> {
                 event.ids.forEach { productStore.remove(it) }
-                emitUi()
+                emitSnapshot()
             }
 
             is ProductEvent.ProductsAdded -> {
                 event.products.forEach {
-                    productStore[it.id] = it
+                    val taxedPrice = it.price?.let { price ->
+                        price * (1 + tax / 100)
+                    }
+                    productStore[it.id] = it.copy(price = taxedPrice)
                 }
-                emitUi()
+                emitSnapshot()
             }
 
             is ProductEvent.StockUpdated -> {
@@ -68,7 +74,7 @@ class ProductViewModel @Inject constructor(
                         productStore[id] = it.copy(stock = stock)
                     }
                 }
-                emitUi()
+                emitSnapshot()
             }
 
             is ProductEvent.PriceUpdated -> {
@@ -77,29 +83,26 @@ class ProductViewModel @Inject constructor(
                         productStore[id] = it.copy(price = price)
                     }
                 }
-                emitUi()
+                emitSnapshot()
             }
 
             is ProductEvent.Error -> {
                 _uiState.value = ProductUiState.Error(event.message)
             }
-
         }
     }
 
-    private fun emitUi() {
-        val currentTax = tax
-
-        val finalProducts = if (currentTax != null) {
-            productStore.values.map { product ->
-                product.copy(
-                    price = (product.price ?: 0.0) * (1 + currentTax / 100)
-                )
+    private fun applyTaxToExistingProducts() {
+        productStore.forEach { (id, product) ->
+            val updatedPrice = product.price?.let {
+                it * (1 + tax / 100)
             }
-        } else {
-            productStore.values.toList()
+            productStore[id] = product.copy(price = updatedPrice)
         }
+    }
 
-        _uiState.value = ProductUiState.Success(finalProducts)
+    private fun emitSnapshot() {
+        _uiState.value = ProductUiState.Success(productStore.values.toList())
     }
 }
+
