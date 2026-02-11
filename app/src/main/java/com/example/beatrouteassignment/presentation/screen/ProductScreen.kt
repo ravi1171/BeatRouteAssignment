@@ -46,7 +46,6 @@ fun ProductScreen(viewModel: ProductViewModel) {
         }
 
         is ProductUiState.Success -> {
-
             val products = (state as ProductUiState.Success).products
 
             if (products.isEmpty()) {
@@ -61,16 +60,10 @@ fun ProductScreen(viewModel: ProductViewModel) {
                     modifier = Modifier
                         .fillMaxSize()
                         .padding(top = 50.dp),
-                    contentPadding = PaddingValues(
-                        horizontal = 16.dp,
-                        vertical = 8.dp
-                    ),
+                    contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
                     verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    items(
-                        items = products,
-                        key = { it.id }
-                    ) { product ->
+                    items(items = products, key = { it.id }) { product ->
                         ProductItem(product)
                         HorizontalDivider()
                     }
@@ -89,7 +82,7 @@ fun ProductScreen(viewModel: ProductViewModel) {
                         style = MaterialTheme.typography.titleMedium
                     )
                     Spacer(modifier = Modifier.height(8.dp))
-                    Button(onClick = { /* retry */ }) {
+                    Button(onClick = { viewModel.retry() }) {
                         Text("Retry")
                     }
                 }
@@ -98,12 +91,12 @@ fun ProductScreen(viewModel: ProductViewModel) {
     }
 }
 
-
-
 @Composable
-fun ProductItem(product: Product) = Column(Modifier
-    .fillMaxWidth()
-    .padding(8.dp)) {
+fun ProductItem(product: Product) = Column(
+    Modifier
+        .fillMaxWidth()
+        .padding(8.dp)
+) {
     Text(product.name ?: "Unknown", style = MaterialTheme.typography.titleMedium)
     Text(product.description ?: "-", style = MaterialTheme.typography.bodyMedium)
     Text("Stock: ${product.stock ?: 0}", style = MaterialTheme.typography.bodyMedium)
