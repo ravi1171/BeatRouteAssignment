@@ -79,6 +79,11 @@ class ProductViewModel @Inject constructor(
                 }
                 emitUi()
             }
+
+            is ProductEvent.Error -> {
+                _uiState.value = ProductUiState.Error(event.message)
+            }
+
         }
     }
 

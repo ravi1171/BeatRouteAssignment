@@ -17,34 +17,59 @@ class ProductUpdatesUseCase @Inject constructor(
 
     fun events(): Flow<ProductEvent> = channelFlow {
 
-        val baseProducts = repository.getAllProducts()
-        send(ProductEvent.BaseProduct(baseProducts))
+        try {
+            val baseProducts = repository.getAllProducts()
+            send(ProductEvent.BaseProduct(baseProducts))
+        } catch (e: Exception) {
+            send(ProductEvent.Error("Failed to load products: ${e.message}"))
+            return@channelFlow
+        }
 
         supervisorScope {
 
             launch(dispatcher) {
-                runCatching { repository.getPriceTax() }
-                    .onSuccess { send(ProductEvent.TaxReceived(it)) }
+                try {
+                    val tax = repository.getPriceTax()
+                    send(ProductEvent.TaxReceived(tax))
+                } catch (e: Exception) {
+                    send(ProductEvent.Error("Tax API failed: ${e.message}"))
+                }
             }
 
             launch(dispatcher) {
-                runCatching { repository.getProductsToDelete() }
-                    .onSuccess { send(ProductEvent.ProductsDeleted(it)) }
+                try {
+                    val ids = repository.getProductsToDelete()
+                    send(ProductEvent.ProductsDeleted(ids))
+                } catch (e: Exception) {
+                    send(ProductEvent.Error("Delete API failed: ${e.message}"))
+                }
             }
 
             launch(dispatcher) {
-                runCatching { repository.getNewProducts() }
-                    .onSuccess { send(ProductEvent.ProductsAdded(it)) }
+                try {
+                    val newProducts = repository.getNewProducts()
+                    send(ProductEvent.ProductsAdded(newProducts))
+                } catch (e: Exception) {
+                    send(ProductEvent.Error("New Products API failed: ${e.message}"))
+                }
             }
 
             launch(dispatcher) {
-                runCatching { repository.getCompanyUpdatedStocks() }
-                    .onSuccess { send(ProductEvent.StockUpdated(it.toMap())) }
+                try {
+                    val stocks = repository.getCompanyUpdatedStocks()
+                    send(ProductEvent.StockUpdated(stocks.toMap()))
+                } catch (e: Exception) {
+                    send(ProductEvent.Error("Stock API failed: ${e.message}"))
+                }
             }
 
             launch(dispatcher) {
-                runCatching { repository.getCompanyUpdatedPrices() }
-                    .onSuccess { send(ProductEvent.PriceUpdated(it.toMap())) }
+                try {
+                    val prices = repository.getCompanyUpdatedPrices()
+                    send(ProductEvent.PriceUpdated(prices.toMap()))
+                } catch (e: Exception) {
+                    send(ProductEvent.Error("Price API failed: ${e.message}"))
+                }
             }
         }
     }

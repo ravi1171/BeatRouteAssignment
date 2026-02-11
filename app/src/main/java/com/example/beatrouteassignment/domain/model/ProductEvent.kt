@@ -9,4 +9,5 @@ sealed class ProductEvent {
     data class ProductsAdded(val products: List<Product>) : ProductEvent()
     data class StockUpdated(val updates: Map<Int, Int>) : ProductEvent()
     data class PriceUpdated(val updates: Map<Int, Double>) : ProductEvent()
+    data class Error(val message: String) : ProductEvent()
 }
