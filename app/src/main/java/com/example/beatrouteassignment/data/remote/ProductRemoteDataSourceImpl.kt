@@ -8,7 +8,7 @@ class ProductRemoteDataSourceImpl @Inject constructor(
     private val api: StreamLibAPI,
 ) : ProductRemoteDataSource {
 
-    override suspend fun getAllProducts(): Collection<Product> = api.getAllProducts().toList()
+    override suspend fun getAllProducts(): Collection<Product> = api.getAllProducts()
 
 
     override suspend fun getPriceTax(): Double = api.getPriceTax()
