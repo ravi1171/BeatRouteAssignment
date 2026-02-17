@@ -5,11 +5,10 @@ import com.example.producthandling.model.Product
 import javax.inject.Inject
 
 class ProductRemoteDataSourceImpl @Inject constructor(
-    private val api: StreamLibAPI,
+    private val api: StreamLibAPI
 ) : ProductRemoteDataSource {
 
     override suspend fun getAllProducts(): Collection<Product> = api.getAllProducts()
-
 
     override suspend fun getPriceTax(): Double = api.getPriceTax()
     override suspend fun getCompanyUpdatedPrices(): List<Pair<Int, Double>> =
