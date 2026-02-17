@@ -69,7 +69,7 @@ class ProductViewModel @Inject constructor(
                 productStore.clear()
                 overriddenPriceIds.clear()
                 tax = null
-                event.products.forEach { productStore[it.id] = it }
+                event.products.toList().forEach { productStore[it.id] = it }
             }
 
             is ProductEvent.TaxReceived -> {
