@@ -19,7 +19,7 @@ class ProductRepositoryImpl @Inject constructor(
 
     override suspend fun getAllProducts(): Result<Collection<Product>> = withContext(ioDispatcher) {
         try {
-            val products = remoteDataSource.getAllProducts().toList()
+            val products = remoteDataSource.getAllProducts()
             Result.Success(products)
         } catch (e: Exception) {
             Result.Error(e)
