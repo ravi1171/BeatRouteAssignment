@@ -1,8 +1,11 @@
 package com.example.beatrouteassignment.data.repository
 
+import com.example.beatrouteassignment.data.model.ProductPriceUpdate
+import com.example.beatrouteassignment.data.model.ProductStockUpdate
 import com.example.beatrouteassignment.data.remote.ProductRemoteDataSource
 import com.example.beatrouteassignment.di.IoDispatcher
 import com.example.beatrouteassignment.domain.repository.ProductRepository
+import com.example.beatrouteassignment.util.Result
 import com.example.producthandling.model.Product
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.withContext
@@ -14,35 +17,62 @@ class ProductRepositoryImpl @Inject constructor(
     @IoDispatcher private val ioDispatcher: CoroutineDispatcher
 ) : ProductRepository {
 
-    override suspend fun getAllProducts(): List<Product> = withContext(ioDispatcher) {
-        val products = remoteDataSource.getAllProducts().toList()
-        products
+    override suspend fun getAllProducts(): Result<Collection<Product>> = withContext(ioDispatcher) {
+        try {
+            val products = remoteDataSource.getAllProducts().toList()
+            Result.Success(products)
+        } catch (e: Exception) {
+            Result.Error(e)
+        }
     }
 
-    override suspend fun getPriceTax(): Double = withContext(ioDispatcher) {
-        val tax = remoteDataSource.getPriceTax()
-        tax
+    override suspend fun getPriceTax(): Result<Double> = withContext(ioDispatcher) {
+        try {
+            val tax = remoteDataSource.getPriceTax()
+            Result.Success(tax)
+        } catch (e: Exception) {
+            Result.Error(e)
+        }
     }
 
-    override suspend fun getCompanyUpdatedPrices(): List<Pair<Int, Double>> =
+    override suspend fun getCompanyUpdatedPrices(): Result<List<ProductPriceUpdate>> =
         withContext(ioDispatcher) {
-            val prices = remoteDataSource.getCompanyUpdatedPrices()
-            prices
-    }
+            try {
+                val prices = remoteDataSource.getCompanyUpdatedPrices()
+                    .map { (id, price) -> ProductPriceUpdate(productId = id, newPrice = price) }
+                Result.Success(prices)
+            } catch (e: Exception) {
+                Result.Error(e)
+            }
+        }
 
-    override suspend fun getCompanyUpdatedStocks(): List<Pair<Int, Int>> =
+    override suspend fun getCompanyUpdatedStocks(): Result<List<ProductStockUpdate>> =
         withContext(ioDispatcher) {
-            val stocks = remoteDataSource.getCompanyUpdatedStocks()
-            stocks
+            try {
+                val stocks = remoteDataSource.getCompanyUpdatedStocks().map { (id, stock) ->
+                    ProductStockUpdate(productId = id, newStock = stock)
+                }
+                Result.Success(stocks)
+            } catch (e: Exception) {
+                Result.Error(e)
+            }
+        }
+
+    override suspend fun getProductsToDelete(): Result<List<Int>> = withContext(ioDispatcher) {
+        try {
+            val ids = remoteDataSource.getProductsToDelete()
+            Result.Success(ids)
+        } catch (e: Exception) {
+            Result.Error(e)
+        }
     }
 
-    override suspend fun getProductsToDelete(): List<Int> = withContext(ioDispatcher) {
-        val ids = remoteDataSource.getProductsToDelete()
-        ids
-    }
-
-    override suspend fun getNewProducts(): List<Product> = withContext(ioDispatcher) {
-        val newProducts = remoteDataSource.getNewProducts()
-        newProducts
+    override suspend fun getNewProducts(): Result<List<Product>> = withContext(ioDispatcher) {
+        try {
+            val newProducts = remoteDataSource.getNewProducts()
+            Result.Success(newProducts)
+        } catch (e: Exception) {
+            Result.Error(e)
+        }
     }
 }

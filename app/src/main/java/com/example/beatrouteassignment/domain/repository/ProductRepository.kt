@@ -1,18 +1,21 @@
 package com.example.beatrouteassignment.domain.repository
 
+import com.example.beatrouteassignment.data.model.ProductPriceUpdate
+import com.example.beatrouteassignment.data.model.ProductStockUpdate
+import com.example.beatrouteassignment.util.Result
 import com.example.producthandling.model.Product
 
 interface ProductRepository {
 
-    suspend fun getAllProducts(): List<Product>
+    suspend fun getAllProducts(): Result<Collection<Product>>
 
-    suspend fun getPriceTax(): Double
+    suspend fun getPriceTax(): Result<Double>
 
-    suspend fun getCompanyUpdatedPrices(): List<Pair<Int, Double>>
+    suspend fun getCompanyUpdatedPrices(): Result<List<ProductPriceUpdate>>
 
-    suspend fun getCompanyUpdatedStocks(): List<Pair<Int, Int>>
+    suspend fun getCompanyUpdatedStocks(): Result<List<ProductStockUpdate>>
 
-    suspend fun getProductsToDelete(): List<Int>
+    suspend fun getProductsToDelete(): Result<List<Int>>
 
-    suspend fun getNewProducts(): List<Product>
+    suspend fun getNewProducts(): Result<List<Product>>
 }
